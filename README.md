@@ -6,8 +6,10 @@ Empat analis AI (Fundamental, Sentimen, Berita & Makro, Teknikal) menilai sebuah
 
 > Alat riset & edukasi — **bukan nasihat keuangan**.
 >
-> ⚠️ DeepSeek belum mendukung **web search** lewat API, jadi analis menalar dari
-> pengetahuan model — **bukan** data pasar real-time. Selalu verifikasi angka.
+> ⚠️ **Harga acuan diambil real-time** dari CoinGecko dan disuntik ke prompt,
+> jadi level harga tidak lagi menebak dari ingatan model. Namun DeepSeek belum
+> mendukung **web search**, jadi konteks berita/makro tetap dari pengetahuan
+> model (bisa usang). Selalu verifikasi sebelum bertindak.
 
 ## Arsitektur
 
