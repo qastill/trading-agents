@@ -20,23 +20,28 @@ const SH = "0 1px 2px rgba(20,23,33,.04), 0 12px 32px -18px rgba(20,23,33,.22)";
 const SH_SOFT = "0 1px 2px rgba(20,23,33,.04), 0 6px 18px -12px rgba(20,23,33,.14)";
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif";
 const MONO = "'JetBrains Mono', ui-monospace, monospace";
-const MODEL = "claude-sonnet-4-20250514";
 
 /* -------------------------------------------------------------- */
-/*  Panggilan Claude API (ditangani runtime artifact Claude.ai)    */
+/*  Panggilan model — lewat serverless function /api/chat          */
+/*  (lihat api/chat.js). API key DeepSeek disuntik di sisi server, */
+/*  tidak pernah terekspos ke browser.                             */
 /* -------------------------------------------------------------- */
-// Lewat dev-proxy Vite (lihat vite.config.js): API key disuntik di sisi server,
-// tidak pernah terekspos ke browser. Bisa di-override via VITE_API_URL.
-const API_URL = import.meta.env.VITE_API_URL || "/api/anthropic/v1/messages";
-async function callClaude({ system, user, useSearch }) {
-  const body = { model: MODEL, max_tokens: 1000, system, messages: [{ role: "user", content: user }] };
-  if (useSearch) body.tools = [{ type: "web_search_20250305", name: "web_search" }];
+const API_URL = import.meta.env.VITE_API_URL || "/api/chat";
+// useSearch dipertahankan di signature agar pemanggil tak perlu berubah, tapi
+// DeepSeek belum mendukung web search via API — jadi parameter ini diabaikan.
+async function callClaude({ system, user }) {
   const res = await fetch(API_URL, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ system, user }),
   });
-  if (!res.ok) throw new Error("API " + res.status);
+  if (!res.ok) {
+    let msg = "API " + res.status;
+    try { const e = await res.json(); if (e?.error) msg += " — " + e.error; } catch { /* abaikan */ }
+    throw new Error(msg);
+  }
   const data = await res.json();
-  const text = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+  const text = (data.text || "").trim();
   if (!text) throw new Error("Respons kosong");
   return text;
 }
