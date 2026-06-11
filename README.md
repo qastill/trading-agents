@@ -1,10 +1,23 @@
 # trading-agents
 
-Meja riset multi-agen ala [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents), diimplementasikan ulang sebagai aplikasi React + Vite dengan Claude API.
+Meja riset multi-agen ala [TauricResearch/TradingAgents](https://github.com/TauricResearch/TradingAgents), diimplementasikan ulang sebagai aplikasi React + Vite yang ditenagai **DeepSeek API**.
 
-Empat analis AI (Fundamental, Sentimen, Berita & Makro, Teknikal) mengumpulkan data pasar terkini, peneliti **bull** & **bear** beradu argumen, trader menyusun proposal, lalu manajer portofolio memberi **satu keputusan akhir** beserta tingkat keyakinan.
+Empat analis AI (Fundamental, Sentimen, Berita & Makro, Teknikal) menilai sebuah aset, peneliti **bull** & **bear** beradu argumen, trader menyusun proposal, lalu manajer portofolio memberi **satu keputusan akhir** beserta tingkat keyakinan.
 
 > Alat riset & edukasi — **bukan nasihat keuangan**.
+>
+> ⚠️ DeepSeek belum mendukung **web search** lewat API, jadi analis menalar dari
+> pengetahuan model — **bukan** data pasar real-time. Selalu verifikasi angka.
+
+## Arsitektur
+
+Browser tidak pernah memegang API key. Semua panggilan model lewat backend:
+
+- **Lokal** (`npm run dev`): middleware `/api/chat` di `vite.config.js`.
+- **Produksi** (Vercel): serverless function `api/chat.js`.
+
+Keduanya membaca `DEEPSEEK_API_KEY` dari environment dan memproksi ke
+`https://api.deepseek.com/chat/completions`.
 
 ## Menjalankan secara lokal
 
@@ -12,9 +25,10 @@ Empat analis AI (Fundamental, Sentimen, Berita & Makro, Teknikal) mengumpulkan d
 # 1. Install dependency
 npm install
 
-# 2. Siapkan API key Anthropic
+# 2. Siapkan API key DeepSeek
 cp .env.example .env
-#   lalu edit .env, isi ANTHROPIC_API_KEY=sk-ant-...
+#   lalu edit .env, isi DEEPSEEK_API_KEY=sk-...
+#   Ambil key di: https://platform.deepseek.com/api_keys (akun perlu saldo)
 
 # 3. Jalankan dev server
 npm run dev
@@ -22,22 +36,19 @@ npm run dev
 
 Buka http://localhost:5173.
 
-### Kenapa butuh dev-proxy?
+## Deploy ke Vercel
 
-Komponen aslinya memanggil `api.anthropic.com` langsung dari browser — di luar
-runtime artifact Claude.ai itu akan gagal karena **CORS** dan **tidak ada API
-key**. Aplikasi ini memakai dev-proxy Vite (`vite.config.js`): browser memanggil
-`/api/anthropic/*`, lalu proxy meneruskannya ke Anthropic dengan menyuntikkan
-header `x-api-key` di sisi server — jadi API key **tidak pernah terekspos ke
-browser**.
+1. Import repo ke Vercel (otomatis terdeteksi sebagai Vite).
+2. **Project Settings → Environment Variables** → tambah `DEEPSEEK_API_KEY`
+   dengan key kamu (scope: Production, Preview, Development).
+3. Deploy. Serverless function `api/chat.js` akan menangani `/api/chat`.
 
-## Build produksi
+> Penting: tanpa env `DEEPSEEK_API_KEY` di Vercel, `/api/chat` akan balas
+> error 500 — bukan analisa. Pastikan env sudah diset lalu **redeploy**.
+
+## Build produksi (lokal)
 
 ```bash
 npm run build    # output ke dist/
-npm run preview  # serve hasil build
+npm run preview  # serve hasil build statis (tanpa /api/chat — pakai `vercel dev` bila perlu)
 ```
-
-Catatan: `npm run preview` menyajikan hasil build statis dan **tidak** menjalankan
-dev-proxy. Untuk produksi, sediakan backend/serverless function sendiri yang
-memproksi ke Anthropic, lalu arahkan lewat env `VITE_API_URL`.
