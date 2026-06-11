@@ -56,8 +56,8 @@ const ANALYSTS = [
     user: (t, d) => `Analisis fundamental ${t} per ${d}.`,
   },
   {
-    id: "sentiment", name: "Sentimen", desc: "Mood pasar & posisi ritel", Icon: Activity,
-    sys: (d) => `Kamu analis sentimen pasar. Per tanggal ${d}, ukur mood dan posisi crowd untuk aset: sentimen ritel/sosial (X, Reddit, forum), fear/greed, dan untuk kripto, funding rate serta posisi long/short bila tersedia. Cari di web. Akhiri satu baris: "Kecenderungan: bullish / netral / bearish". Tulis ringkas (maks ~140 kata) dalam Bahasa Indonesia, poin padat.`,
+    id: "sentiment", name: "Sentimen", desc: "Mood pasar & minat ritel", Icon: Activity,
+    sys: (d) => `Kamu analis sentimen pasar untuk trader SPOT (beli & simpan aset, tanpa leverage / short). Per tanggal ${d}, ukur mood dan minat crowd: sentimen ritel/sosial (X, Reddit, forum), fear/greed, serta untuk kripto sinyal akumulasi/distribusi spot seperti arus dana masuk/keluar exchange dan minat beli ritel. Abaikan metrik khusus derivatif (funding rate, open interest, posisi long/short) kecuali sebagai konteks risiko. Akhiri satu baris: "Kecenderungan: bullish / netral / bearish". Tulis ringkas (maks ~140 kata) dalam Bahasa Indonesia, poin padat.`,
     user: (t, d) => `Nilai sentimen jangka pendek ${t} per ${d}.`,
   },
   {
@@ -72,12 +72,12 @@ const ANALYSTS = [
   },
 ];
 
-const BULL_SYS = `Kamu peneliti BULLISH dalam debat firma trading. Hanya dari laporan analis yang diberikan, bangun argumen berbasis bukti terkuat untuk POSISI BELI. Persuasif tapi jujur; akui satu risiko terbesar di baris akhir. Maks 140 kata, Bahasa Indonesia.`;
-const BEAR_SYS = `Kamu peneliti BEARISH dalam debat firma trading. Hanya dari laporan analis yang diberikan, bangun argumen berbasis bukti terkuat untuk JUAL atau menjauh. Persuasif tapi jujur; akui satu penyanggah terbesar di baris akhir. Maks 140 kata, Bahasa Indonesia.`;
+const BULL_SYS = `Kamu peneliti BULLISH dalam debat firma trading SPOT. Hanya dari laporan analis yang diberikan, bangun argumen berbasis bukti terkuat untuk MEMBELI & MENYIMPAN aset (spot, tanpa leverage). Persuasif tapi jujur; akui satu risiko terbesar di baris akhir. Maks 140 kata, Bahasa Indonesia.`;
+const BEAR_SYS = `Kamu peneliti BEARISH dalam debat firma trading SPOT. Hanya dari laporan analis yang diberikan, bangun argumen berbasis bukti terkuat untuk MENJUAL / mengurangi posisi atau menunggu di luar (tanpa short). Persuasif tapi jujur; akui satu penyanggah terbesar di baris akhir. Maks 140 kata, Bahasa Indonesia.`;
 const REBUT_SYS = (s) => `Kamu peneliti ${s}. Kamu sudah menyampaikan argumenmu. Ini argumen lawan. Sanggah titik terlemahnya dan perkuat poin terkuatmu. Maks 100 kata, Bahasa Indonesia.`;
-const TRADER_SYS = `Kamu trader. Sintesiskan laporan analis dan debat bull/bear jadi SATU proposal konkret: arah (long / flat / short — sikap riset, bukan nasihat), keyakinan (rendah/sedang/tinggi), zona entry yang disarankan, level invalidasi, dan 2–3 baris alasan. Tegas. Maks ~140 kata, Bahasa Indonesia. Ini riset, bukan nasihat keuangan.`;
-const PM_SYS = `Kamu manajer portofolio & risiko — pengambil keputusan akhir. Timbang analis, debat, dan proposal trader terhadap risiko (volatilitas, likuiditas, crowding, risiko peristiwa). Jawab HANYA satu objek JSON minified, tanpa markdown, tanpa code fence, tanpa teks lain. Skema:
-{"decision":"BUY"|"HOLD"|"SELL","confidence":<int 0-100>,"horizon":"<mis. swing / 1-4 minggu>","entry":"<catatan entry/pemicu singkat>","rationale":"<=40 kata Bahasa Indonesia>","risks":["<singkat>","<singkat>","<singkat>"]}
+const TRADER_SYS = `Kamu trader SPOT (hanya beli/simpan/jual aset — TANPA leverage, TANPA short, TANPA futures). Sintesiskan laporan analis dan debat bull/bear jadi SATU proposal konkret: sikap (akumulasi / tahan / kurangi-jual — sikap riset, bukan nasihat), keyakinan (rendah/sedang/tinggi), zona harga beli yang menarik (atau zona jual bila distribusi), level batal tesis, dan 2–3 baris alasan. Tegas. Maks ~140 kata, Bahasa Indonesia. Ini riset, bukan nasihat keuangan.`;
+const PM_SYS = `Kamu manajer portofolio & risiko untuk akun SPOT (hanya beli/simpan/jual aset — tanpa leverage / short / futures) — pengambil keputusan akhir. Timbang analis, debat, dan proposal trader terhadap risiko (volatilitas, likuiditas, risiko peristiwa). decision BUY = akumulasi/beli spot, HOLD = tahan/tunggu, SELL = kurangi/jual posisi spot. Jangan menyarankan short atau leverage. Jawab HANYA satu objek JSON minified, tanpa markdown, tanpa code fence, tanpa teks lain. Skema:
+{"decision":"BUY"|"HOLD"|"SELL","confidence":<int 0-100>,"horizon":"<mis. swing / 1-4 minggu>","entry":"<zona harga beli/jual spot singkat>","rationale":"<=40 kata Bahasa Indonesia>","risks":["<singkat>","<singkat>","<singkat>"]}
 Nilai "rationale" dan "risks" wajib Bahasa Indonesia.`;
 
 /* -------------------------------------------------------------- */
@@ -356,7 +356,7 @@ export default function TradingAgentsApp() {
             </div>
             <div>
               <div style={{ fontFamily: FONT, fontSize: 20, fontWeight: 800, letterSpacing: -0.3 }}>TradingAgents</div>
-              <div style={{ fontSize: 12.5, color: T.faint }}>Meja riset multi-agen</div>
+              <div style={{ fontSize: 12.5, color: T.faint }}>Meja riset multi-agen · spot</div>
             </div>
           </div>
           <a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noreferrer"
