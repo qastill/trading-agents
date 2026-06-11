@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
+import { getMarketSnapshot } from "./api/_lib/market.js";
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -52,6 +53,15 @@ export default defineConfig(({ mode }) => {
           res.statusCode = 500;
           return res.end(JSON.stringify({ error: String(e?.message || e) }));
         }
+      });
+
+      // Harga real-time lokal: GET /api/price?ticker=BTC
+      server.middlewares.use("/api/price", async (req, res) => {
+        res.setHeader("Content-Type", "application/json");
+        const ticker = new URL(req.url, "http://localhost").searchParams.get("ticker");
+        const snap = await getMarketSnapshot(ticker);
+        res.statusCode = snap.ok ? 200 : (snap.status || 500);
+        return res.end(JSON.stringify(snap.ok ? snap : { error: snap.error }));
       });
     },
   };

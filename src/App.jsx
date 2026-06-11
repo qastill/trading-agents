@@ -46,6 +46,19 @@ async function callClaude({ system, user }) {
   return text;
 }
 
+// Ambil harga real-time (CoinGecko via /api/price) untuk grounding analisa.
+async function fetchPrice(ticker) {
+  try {
+    const res = await fetch(`/api/price?ticker=${encodeURIComponent(ticker)}`);
+    if (!res.ok) return null;
+    const d = await res.json();
+    return typeof d.price === "number" ? d : null;
+  } catch { return null; }
+}
+const fmtUSD = (n) =>
+  n >= 1 ? n.toLocaleString("en-US", { maximumFractionDigits: 2 })
+         : n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+
 /* -------------------------------------------------------------- */
 /*  Daftar agen                                                    */
 /* -------------------------------------------------------------- */
@@ -136,6 +149,40 @@ function AgentCard({ name, desc, Icon, agent, accent = T.accent }) {
         <StatusChip status={status} />
       </div>
       <Report text={agent?.content} />
+    </div>
+  );
+}
+function MarketBar({ market }) {
+  if (!market) return null;
+  if (market.error || typeof market.price !== "number") {
+    return (
+      <div style={{
+        marginBottom: 18, padding: "11px 15px", borderRadius: 12, fontFamily: FONT, fontSize: 13,
+        color: T.hold, background: `${T.hold}10`, border: `1px solid ${T.hold}33`,
+        display: "flex", alignItems: "center", gap: 9,
+      }}>
+        <AlertTriangle size={15} /> Harga real-time {market.ticker || "aset"} tak ditemukan (mungkin bukan kripto) — analis akan berhati-hati & tak memakai harga absolut.
+      </div>
+    );
+  }
+  const up = (market.change24h ?? 0) >= 0;
+  const cc = up ? T.buy : T.sell;
+  return (
+    <div style={{
+      marginBottom: 18, padding: "13px 16px", borderRadius: 12, background: T.card,
+      border: `1px solid ${T.line}`, boxShadow: SH_SOFT,
+      display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+    }}>
+      <span style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: 1, color: T.faint, textTransform: "uppercase" }}>Harga acuan · {market.ticker}</span>
+      <span style={{ fontFamily: MONO, fontSize: 20, fontWeight: 600, color: T.ink }}>${fmtUSD(market.price)}</span>
+      {market.change24h != null && (
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 4, fontFamily: MONO, fontSize: 13, fontWeight: 600, color: cc }}>
+          {up ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+          {up ? "+" : ""}{market.change24h.toFixed(2)}% <span style={{ color: T.faint, fontWeight: 400 }}>24j</span>
+        </span>
+      )}
+      <span style={{ flex: 1 }} />
+      <span style={{ fontFamily: FONT, fontSize: 11.5, color: T.faint }}>real-time · CoinGecko</span>
     </div>
   );
 }
@@ -281,6 +328,7 @@ export default function TradingAgentsApp() {
   const [agents, setAgents] = useState({});
   const [stage, setStage] = useState(0);
   const [err, setErr] = useState("");
+  const [market, setMarket] = useState(null);
   const resultsRef = useRef(null);
 
   useEffect(() => {
@@ -305,19 +353,27 @@ export default function TradingAgentsApp() {
   async function run() {
     if (!ticker.trim() || running) return;
     const tk = ticker.trim().toUpperCase();
-    setRunning(true); setErr(""); setAgents({}); setStage(1);
+    setRunning(true); setErr(""); setAgents({}); setMarket(null); setStage(1);
 
     const desk = ANALYSTS.filter((a) => enabled[a.id]);
     if (!desk.length) { setErr("Pilih minimal satu analis."); setRunning(false); setStage(0); return; }
-    const reports = await Promise.all(desk.map((a) => runAgent(a.id, () => callClaude({ system: a.sys(date), user: a.user(tk, date), useSearch: true }))));
+
+    // Grounding harga real-time — supaya analis tak menebak dari ingatan model.
+    const snap = await fetchPrice(tk);
+    setMarket(snap || { error: true, ticker: tk });
+    const mkt = snap
+      ? `DATA PASAR REAL-TIME (sumber CoinGecko, diambil ${new Date().toISOString()}): harga ${tk} saat ini = $${fmtUSD(snap.price)}${snap.change24h != null ? ` (${snap.change24h >= 0 ? "+" : ""}${snap.change24h.toFixed(2)}% dalam 24 jam)` : ""}. WAJIB pakai angka ini sebagai harga acuan "saat ini" untuk semua level/zona; JANGAN memakai harga dari ingatanmu.`
+      : `CATATAN PENTING: data harga real-time untuk ${tk} tidak tersedia. JANGAN mengarang harga absolut spesifik — nyatakan ketidakpastian dan beri level secara relatif/bersyarat saja.`;
+
+    const reports = await Promise.all(desk.map((a) => runAgent(a.id, () => callClaude({ system: a.sys(date), user: `${a.user(tk, date)}\n\n${mkt}` }))));
     const good = desk.map((a, i) => ({ name: a.name, text: reports[i] })).filter((r) => r.text);
     if (!good.length) { setErr("Semua analis gagal — periksa koneksi lalu coba lagi."); setRunning(false); return; }
     const ctx = good.map((r) => `## Analis ${r.name}\n${r.text}`).join("\n\n");
 
     setStage(2);
     const [bull1, bear1] = await Promise.all([
-      runAgent("bull", () => callClaude({ system: BULL_SYS, user: `Laporan analis untuk ${tk}:\n\n${ctx}\n\nSusun argumen BULL terkuat.` })),
-      runAgent("bear", () => callClaude({ system: BEAR_SYS, user: `Laporan analis untuk ${tk}:\n\n${ctx}\n\nSusun argumen BEAR terkuat.` })),
+      runAgent("bull", () => callClaude({ system: BULL_SYS, user: `${mkt}\n\nLaporan analis untuk ${tk}:\n\n${ctx}\n\nSusun argumen BULL terkuat.` })),
+      runAgent("bear", () => callClaude({ system: BEAR_SYS, user: `${mkt}\n\nLaporan analis untuk ${tk}:\n\n${ctx}\n\nSusun argumen BEAR terkuat.` })),
     ]);
     let bullText = bull1, bearText = bear1;
     if (depth === "deep" && bull1 && bear1) {
@@ -331,15 +387,15 @@ export default function TradingAgentsApp() {
     const debate = `### Argumen bull\n${bullText || "(kosong)"}\n\n### Argumen bear\n${bearText || "(kosong)"}`;
 
     setStage(3);
-    const trade = await runAgent("trader", () => callClaude({ system: TRADER_SYS, user: `Aset: ${tk} · Tanggal: ${date}\n\nLaporan analis:\n${ctx}\n\nDebat riset:\n${debate}\n\nBerikan proposal posisimu.` }));
+    const trade = await runAgent("trader", () => callClaude({ system: TRADER_SYS, user: `Aset: ${tk} · Tanggal: ${date}\n${mkt}\n\nLaporan analis:\n${ctx}\n\nDebat riset:\n${debate}\n\nBerikan proposal posisimu.` }));
 
     setStage(4);
-    await runAgent("portfolio", () => callClaude({ system: PM_SYS, user: `Aset: ${tk} · Tanggal: ${date}\n\nLaporan analis:\n${ctx}\n\nDebat:\n${debate}\n\nProposal trader:\n${trade || "(kosong)"}\n\nKeluarkan JSON keputusan.` }));
+    await runAgent("portfolio", () => callClaude({ system: PM_SYS, user: `Aset: ${tk} · Tanggal: ${date}\n${mkt}\n\nLaporan analis:\n${ctx}\n\nDebat:\n${debate}\n\nProposal trader:\n${trade || "(kosong)"}\n\nKeluarkan JSON keputusan.` }));
 
     setRunning(false);
     setTimeout(() => resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 200);
   }
-  const reset = () => { setAgents({}); setStage(0); setErr(""); };
+  const reset = () => { setAgents({}); setStage(0); setErr(""); setMarket(null); };
 
   const desk = ANALYSTS.filter((a) => enabled[a.id]);
   const hasRun = Object.keys(agents).length > 0;
@@ -432,6 +488,7 @@ export default function TradingAgentsApp() {
         {/* pipeline */}
         {hasRun && (
           <div ref={resultsRef} style={{ marginTop: 38 }}>
+            <MarketBar market={market} />
             <StageHead n="01" title="Tim Analis" active={stage >= 1} />
             <div className="ta-grid">
               {desk.map((a) => <AgentCard key={a.id} name={a.name} desc={a.desc} Icon={a.Icon} agent={agents[a.id]} />)}
