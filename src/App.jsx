@@ -25,10 +25,13 @@ const MODEL = "claude-sonnet-4-20250514";
 /* -------------------------------------------------------------- */
 /*  Panggilan Claude API (ditangani runtime artifact Claude.ai)    */
 /* -------------------------------------------------------------- */
+// Lewat dev-proxy Vite (lihat vite.config.js): API key disuntik di sisi server,
+// tidak pernah terekspos ke browser. Bisa di-override via VITE_API_URL.
+const API_URL = import.meta.env.VITE_API_URL || "/api/anthropic/v1/messages";
 async function callClaude({ system, user, useSearch }) {
   const body = { model: MODEL, max_tokens: 1000, system, messages: [{ role: "user", content: user }] };
   if (useSearch) body.tools = [{ type: "web_search_20250305", name: "web_search" }];
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(API_URL, {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("API " + res.status);
